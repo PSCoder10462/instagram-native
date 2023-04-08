@@ -6,7 +6,9 @@ import {
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
 import { auth, db } from '../config/firebaseConfig';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useDispatch } from 'react-redux';
+import { signIn } from '../redux/slices/userSlice';
 
 const AuthForm = () => {
   const navigation = useNavigation();
@@ -14,6 +16,8 @@ const AuthForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+
+  const dispatch = useDispatch();
 
   const handleSubmit = async () => {
     const pattern = '^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$';
@@ -33,15 +37,27 @@ const AuthForm = () => {
           password
         );
         const { user } = userCredentail;
+
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const { username } = docSnap.data();
+          dispatch(signIn({ username, email: user.email, uid: user.uid }));
+        } else {
+          // docSnap.data() will be undefined in this case
+          console.log('No such document!');
+        }
       } else {
-        const user = await createUserWithEmailAndPassword(
+        const { user } = await createUserWithEmailAndPassword(
           auth,
           email,
           password
         );
-        await setDoc(doc(db, 'users', user.user.uid), {
-          name: username,
+        await setDoc(doc(db, 'users', user.uid), {
+          username,
         });
+        dispatch(signIn({ username, email: user.email, uid: user.uid }));
       }
     } catch (error) {
       console.log(error);
